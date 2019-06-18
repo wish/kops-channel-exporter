@@ -1,12 +1,15 @@
 package main
 
 import (
+	"crypto/md5"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,7 +39,9 @@ var (
 			Name: "kops_channel_updated",
 			Help: "Last time the addon was updated.",
 		},
-		[]string{"name", "channel", "version", "id"},
+		// TODO(tvi): Refactor.
+		// []string{"name", "channel", "version", "id"},
+		[]string{"name"},
 	)
 )
 
@@ -86,13 +91,26 @@ func fetch() {
 				panic(err)
 			}
 
-			now := int32(time.Now().Unix())
+			gen := a.Id
+			if a.Id == "" {
+				gen = a.Version
+			}
+
+			h := md5.New()
+			io.WriteString(h, gen)
+			s := fmt.Sprintf("%x", h.Sum(nil))[:6]
+			n, err := strconv.ParseUint(s, 16, 32)
+			if err != nil {
+				panic(err)
+			}
+
 			updatedTimestamp.With(prometheus.Labels{
-				"name":    name,
-				"channel": a.Channel,
-				"version": a.Version,
-				"id":      a.Id,
-			}).Set(float64(now))
+				"name": name,
+				// TODO(tvi): Refactor.
+				// "channel": a.Channel,
+				// "version": a.Version,
+				// "id":      a.Id,
+			}).Set(float64(uint32(n)))
 		}
 	}
 }
